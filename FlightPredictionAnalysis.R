@@ -23,7 +23,6 @@ library(dismo)
 # install.packages("gbm")
 # install.packages("dismo")
 
-
 setwd("D:/Repositories/DOT-Ontime-Flights/FlightsPredictionAndAnalysis")
 
 odbcChannel <- odbcConnect("FlightsData")
@@ -158,8 +157,8 @@ Test = subset(featuresAndTarget, split==FALSE)
 # CV
 gbmCV <- gbm.step(data=Train, gbm.x = c('DayOfWeek','Hour','DepartureClass','Airport_Delay',
                                         'diverted','carrier','OriginBusyness', 'departure_delay','departclass'), gbm.y=c('LateOrNot'), 
-                max.trees=8000, family="bernoulli", n.trees=35, tree.complexity=2, step.size=35, 
-                learning.rate=0.0075, plot.main=T) 
+                max.trees=4000, family="bernoulli", n.trees=50, tree.complexity=2, step.size=50, 
+                learning.rate=0.01, plot.main=T) 
 
 summary(gbmCV)
 gbm.perf(gbmCV) # no of trees we want to use for prediction
@@ -178,8 +177,6 @@ summary(preds90)
 str(preds90)
 
 # trying to use cross validation to pick a good threshold
-# install.packages("ROCR")
-library(ROCR)
 
 # to make an ROC curve one needs actual values and predicted values, both are given below.
 # These functions will do the groupings on their own (p > 0.2, etc.) like we were doing above
