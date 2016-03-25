@@ -113,7 +113,7 @@ featuresAndTarget <- sqlQuery(odbcChannel, "select
                               case when arrival_delay > 10 then 'ArrivalDelayed' when
                               arrival_delay >= -10 and arrival_delay <= 10 then 'ArrivalOnTime' 
                               else 'ArrivalBeforeTime' end as 'ArrivalTarget', 
-                              zs.OriginBusyness, 
+                              zs.OriginBusyness, (security_delay + nas_delay) as 'Airport_Delay',
                               case when departure_delay > 10 then 'DepartureDelayed' when
                               departure_delay >= -10 and departure_delay <= 10 then 'DepartureOnTime' 
                               else 'DepartureBeforeTime' end as 'DepartureClass' 
@@ -126,8 +126,8 @@ split = sample.split(featuresAndTarget$ArrivalTarget, SplitRatio = 0.80)
 Train = subset(featuresAndTarget, split==TRUE)
 Test = subset(featuresAndTarget, split==FALSE)
 
-#DayOfWeek+ Hour+distance+zs.OriginBusyness
-FlightArrivalForest = randomForest(ArrivalTarget ~ diverted+DepartureClass, 
+#DayOfWeek+ distance+OriginBusyness
+FlightArrivalForest = randomForest(ArrivalTarget ~ diverted+DepartureClass+Hour+OriginBusyness, 
                                    data = Train, ntree=2000, nodesize=5,mtry=3, 
                               na.action=na.omit)
 
@@ -138,30 +138,42 @@ Test$ArrivalTarget = as.factor(Test$ArrivalTarget)
 PredictForest = predict(FlightArrivalForest, newdata = Test)
 
 table(Test$ArrivalTarget, PredictForest)
-accuracy = (2967+64)/(2967+64+94+521)
-accuracy
+accuracy = 53
 
 #Making binomial prediction using random forests  -later, maybe we could do one vs all
 
-##GBM
-m90 <- gbm.step(data=Train, gbm.x = c('DayOfWeek','Hour','DepartureClass'), gbm.y=c('ArrivalTarget'), 
-                max.trees=3000, family="multinomial", n.trees=15, tree.complexity=6, step.size=25, 
-                learning.rate=0.0025, plot.main=T) 
+##GBM tree.complexity=6, step.size=25,
 
-summary(m90)
-gbm.perf(m90) # no of trees we want to use for prediction
+#Trying to predict just late and on time this time
+featuresAndTarget$LateOrNot = ifelse(featuresAndTarget$arrival_delay >=5, 0, 1)
+featuresAndTarget$departclass = ifelse(featuresAndTarget$departure_delay >=5, 0, 1)
+
+str(featuresAndTarget)
+
+set.seed(3000)
+split = sample.split(featuresAndTarget$LateOrNot, SplitRatio = 0.80)
+Train = subset(featuresAndTarget, split==TRUE)
+Test = subset(featuresAndTarget, split==FALSE)
+
+# CV
+gbmCV <- gbm.step(data=Train, gbm.x = c('DayOfWeek','Hour','DepartureClass','Airport_Delay',
+                                        'diverted','carrier','OriginBusyness', 'departure_delay','departclass'), gbm.y=c('LateOrNot'), 
+                max.trees=8000, family="bernoulli", n.trees=35, tree.complexity=2, step.size=35, 
+                learning.rate=0.0075, plot.main=T) 
+
+summary(gbmCV)
+gbm.perf(gbmCV) # no of trees we want to use for prediction
 
 # Trying to see more closely which variables are good for prediction
-# distance/distancerange and SAT2
-for(i in 1:length(m90$var.names)){
-  plot(m90, i.var = i,
-       , ntrees = gbm.perf(m90, plot.it = FALSE)
+for(i in 1:length(gbmCV$var.names)){
+  plot(gbmCV, i.var = i,
+       ntrees = gbm.perf(gbmCV, plot.it = FALSE)
        , ntype = "response"
   )
 }
 
 # actual prediction,no of trees come from gbm.perf
-preds90 <- predict.gbm(m90, Test, n.trees=2000, type="response")
+preds90 <- predict.gbm(gbmCV, Test, n.trees=, type="response")
 summary(preds90)
 str(preds90)
 
