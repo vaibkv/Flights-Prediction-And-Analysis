@@ -16,12 +16,14 @@ library(caTools)
 library(randomForest)
 library(gbm)
 library(dismo)
+library(ROCR)
 
 # install.packages("Hmisc")
 # install.packages("dplyr")
 #install.packages("randomForest")
 # install.packages("gbm")
 # install.packages("dismo")
+# install.packages("ROCR")
 
 setwd("D:/Repositories/DOT-Ontime-Flights/FlightsPredictionAndAnalysis")
 
@@ -172,15 +174,15 @@ for(i in 1:length(gbmCV$var.names)){
 }
 
 # actual prediction,no of trees come from gbm.perf
-preds90 <- predict.gbm(gbmCV, Test, n.trees=, type="response")
-summary(preds90)
-str(preds90)
+preds <- predict.gbm(gbmCV, Test, n.trees=4000, type="response")
+summary(preds)
+str(preds)
 
 # trying to use cross validation to pick a good threshold
 
 # to make an ROC curve one needs actual values and predicted values, both are given below.
 # These functions will do the groupings on their own (p > 0.2, etc.) like we were doing above
-ROCRpred = prediction(preds90, Test$target)
+ROCRpred = prediction(preds, Test$LateOrNot)
 
 # Performance function
 ROCRperf = performance(ROCRpred, "tpr", "fpr")
